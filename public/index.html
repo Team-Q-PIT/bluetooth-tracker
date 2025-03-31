@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bluetoothデバイス位置追跡</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .map-container {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      position: relative;
+    }
+    
+    .grid-map {
+      width: 100%;
+      height: 600px;
+      background-color: #f0f0f0;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #ddd;
+    }
+    
+    .grid-line {
+      position: absolute;
+      background-color: rgba(200, 200, 200, 0.5);
+    }
+    
+    .device {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: #3498db;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      cursor: pointer;
+      box-shadow: 0 0 0 2px white;
+      transition: all 0.3s ease;
+    }
+    
+    .device.smartphone {
+      background-color: #3498db;
+    }
+    
+    .device.headphones {
+      background-color: #e74c3c;
+    }
+    
+    .device.other {
+      background-color: #2ecc71;
+    }
+    
+    .device-tooltip {
+      position: absolute;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    
+    .legend {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 0 15px;
+    }
+    
+    .legend-color {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+    
+    .control-panel {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .device-list {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .device-item {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .device-item:last-child {
+      border-bottom: none;
+    }
+    
+    .device-info {
+      flex: 1;
+    }
+    
+    .device-mac {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 3px;
+    }
+    
+    .device-details {
+      font-size: 12px;
+      color: #999;
+    }
+    
+    .device-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    
+    .status {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 4px;
+      font-size: 14px;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .status.visible {
+      opacity: 1;
+    }
+    
+    .grid-marker {
+      position: absolute;
+      color: #999;
+      font-size: 10px;
+      pointer-events: none;
+    }
+    
+    button {
+      padding: 8px 16px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s ease;
+    }
+    
+    button:hover {
+      background-color: #2980b9;
+    }
+    
+    select {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    @media (max-width: 768px) {
+      .grid-map {
+        height: 400px;
+      }
+      
+      .controls {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Bluetoothデバイス位置追跡</h1>
+    
+    <div class="map-container">
+      <div class="grid-map" id="grid-map"></div>
+      
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background-color: #3498db;"></div>
+          <span>スマートフォン</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background-color: #e74c3c;"></div>
+          <span>ヘッドフォン</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background-color: #2ecc71;"></div>
+          <span>その他のデバイス</span>
+        </div>
+      </div>
+      
+      <div class="controls">
+        <button id="zoom-in">ズームイン</button>
+        <button id="zoom-out">ズームアウト</button>
+        <button id="reset-view">表示をリセット</button>
+        <select id="zone-filter">
+          <option value="all">全てのゾーン</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="control-panel">
+      <h2>検出されたデバイス</h2>
+      <div class="device-list" id="device-list"></div>
+    </div>
+  </div>
+  
+  <div class="status" id="status"></div>
+  <div class="device-tooltip" id="tooltip"></div>
+  
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // グローバル変数
+      const gridMap = document.getElementById('grid-map');
+      const tooltip = document.getElementById('tooltip');
+      const deviceList = document.getElementById('device-list');
+      const status = document.getElementById('status');
+      const zoneFilter = document.getElementById('zone-filter');
+      
+      let devices = [];
+      let zoomLevel = 1;
+      let panOffset = { x: 0, y: 0 };
+      let isDragging = false;
+      let lastMousePos = { x: 0, y: 0 };
+      let selectedZone = 'all';
+      
+      // グリッドのサイズ
+      const cellSize = 50; // グリッドのセル1つのサイズ（px）
+      
+      // Socket.ioの接続
+      const socket = io();
+      
+      // デバイス位置情報の受信
+      socket.on('deviceLocations', (data) => {
+        devices = data;
+        showStatus(`${data.length}台のデバイスを検出しました`);
+        updateZoneFilter(data);
+        updateDeviceMarkers();
+        updateDeviceList();
+      });
+      
+      // 接続時のイベント
+      socket.on('connect', () => {
+        showStatus('サーバーに接続しました');
+      });
+      
+      // 切断時のイベント
+      socket.on('disconnect', () => {
+        showStatus('サーバーから切断されました', true);
+      });
+      
+      // グリッドの初期化
+      initializeGrid();
+      
+      // グリッドの表示を初期化
+      function initializeGrid() {
+        // グリッドのクリア
+        gridMap.innerHTML = '';
+        
+        // グリッドの幅と高さ
+        const width = gridMap.clientWidth;
+        const height = gridMap.clientHeight;
+        
+        // 縦線の描画
+        for (let x = 0; x <= width; x += cellSize * zoomLevel) {
+          const line = document.createElement('div');
+          line.className = 'grid-line';
+          line.style.left = `${x + panOffset.x % (cellSize * zoomLevel)}px`;
+          line.style.top = '0';
+          line.style.width = '1px';
+          line.style.height = '100%';
+          gridMap.appendChild(line);
+          
+          // 座標の表示
+          const realX = Math.floor((x - panOffset.x) / (cellSize * zoomLevel));
+          if (realX >= 0 && realX % 5 === 0) {
+            const marker = document.createElement('div');
+            marker.className = 'grid-marker';
+            marker.textContent = realX;
+            marker.style.left = `${x + panOffset.x % (cellSize * zoomLevel) + 2}px`;
+            marker.style.top = '2px';
+            gridMap.appendChild(marker);
+          }
+        }
+        
+        // 横線の描画
+        for (let y = 0; y <= height; y += cellSize * zoomLevel) {
+          const line = document.createElement('div');
+          line.className = 'grid-line';
+          line.style.left = '0';
+          line.style.top = `${y + panOffset.y % (cellSize * zoomLevel)}px`;
+          line.style.width = '100%';
+          line.style.height = '1px';
+          gridMap.appendChild(line);
+          
+          // 座標の表示
+          const realY = Math.floor((y - panOffset.y) / (cellSize * zoomLevel));
+          if (realY >= 0 && realY % 5 === 0) {
+            const marker = document.createElement('div');
+            marker.className = 'grid-marker';
+            marker.textContent = realY;
+            marker.style.left = '2px';
+            marker.style.top = `${y + panOffset.y % (cellSize * zoomLevel) + 2}px`;
+            gridMap.appendChild(marker);
+          }
+        }
+        
+        // デバイスマーカーの更新
+        updateDeviceMarkers();
+      }
+      
+      // デバイスマーカーの更新
+      function updateDeviceMarkers() {
+        // 既存のデバイスマーカーを削除
+        document.querySelectorAll('.device').forEach(el => el.remove());
+        
+        // 新しいデバイスマーカーを作成
+        devices.forEach(device => {
+          // ゾーンフィルタリング
+          if (selectedZone !== 'all' && device.zone !== selectedZone) {
+            return;
+          }
+          
+          const marker = document.createElement('div');
+          marker.className = 'device';
+          marker.id = `device-${device.mac_address.replace(/:/g, '-')}`;
+          
+          // デバイスの種類に基づいてクラスを追加
+          const deviceType = getDeviceType(device.mac_address, device.name);
+          marker.classList.add(deviceType);
+          
+          // 座標をグリッド座標からピクセル座標に変換
+          const pixelX = device.x * cellSize * zoomLevel + panOffset.x;
+          const pixelY = device.y * cellSize * zoomLevel + panOffset.y;
+          
+          marker.style.left = `${pixelX}px`;
+          marker.style.top = `${pixelY}px`;
+          
+          // マウスオーバー時のツールチップ
+          marker.addEventListener('mouseover', (e) => {
+            showTooltip(device, e);
+          });
+          
+          marker.addEventListener('mousemove', (e) => {
+            positionTooltip(e);
+          });
+          
+          marker.addEventListener('mouseout', () => {
+            hideTooltip();
+          });
+          
+          // クリック時にそのデバイスにフォーカス
+          marker.addEventListener('click', () => {
+            // デバイスリスト内のそのデバイスをハイライト
+            const listItem = document.getElementById(`list-${device.mac_address.replace(/:/g, '-')}`);
+            if (listItem) {
+              listItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              listItem.style.backgroundColor = '#f0f8ff';
+              setTimeout(() => {
+                listItem.style.backgroundColor = '';
+              }, 2000);
+            }
+          });
+          
+          gridMap.appendChild(marker);
+        });
+      }
+      
+      // デバイスリストの更新
+      function updateDeviceList() {
+        deviceList.innerHTML = '';
+        
+        if (devices.length === 0) {
+          const emptyMessage = document.createElement('div');
+          emptyMessage.className = 'device-item';
+          emptyMessage.textContent = 'デバイスが検出されていません';
+          deviceList.appendChild(emptyMessage);
+          return;
+        }
+        
+        // デバイスのフィルタリングとソート
+        const filteredDevices = devices
+          .filter(device => selectedZone === 'all' || device.zone === selectedZone)
+          .sort((a, b) => b.last_seen - a.last_seen);
+        
+        filteredDevices.forEach(device => {
+          const item = document.createElement('div');
+          item.className = 'device-item';
+          item.id = `list-${device.mac_address.replace(/:/g, '-')}`;
+          
+          const deviceType = getDeviceType(device.mac_address, device.name);
+          const lastSeen = new Date(device.last_seen * 1000);
+          const timeString = lastSeen.toLocaleTimeString();
+          
+          item.innerHTML = `
+            <div class="device-indicator" style="background-color: ${getColorByType(deviceType)}"></div>
+            <div class="device-info">
+              <div class="device-mac">${device.mac_address}</div>
+              <div class="device-details">
+                ${device.name ? device.name : 'Unknown Device'} | 
+                座標: (${device.x}, ${device.y}) | 
+                ゾーン: ${device.zone} | 
+                最終検出: ${timeString}
+              </div>
+            </div>
+          `;
+          
+          // クリック時にそのデバイスにフォーカス
+          item.addEventListener('click', () => {
+            const marker = document.getElementById(`device-${device.mac_address.replace(/:/g, '-')}`);
+            if (marker) {
+              // ビューを調整してデバイスを中央に表示
+              centerViewOnDevice(device);
+              
+              // マーカーをハイライト
+              marker.style.transform = 'translate(-50%, -50%) scale(1.5)';
+              marker.style.boxShadow = '0 0 0 4px white, 0 0 10px 5px rgba(0, 0, 0, 0.3)';
+              setTimeout(() => {
+                marker.style.transform = 'translate(-50%, -50%) scale(1)';
+                marker.style.boxShadow = '0 0 0 2px white';
+              }, 2000);
+            }
+          });
+          
+          deviceList.appendChild(item);
+        });
+      }
+      
+      // ゾーンフィルターの更新
+      function updateZoneFilter(data) {
+        // 現在選択されているゾーンを記憶
+        const currentZone = zoneFilter.value;
+        
+        // 一旦クリア（'all'オプションのみ残す）
+        zoneFilter.innerHTML = '<option value="all">全てのゾーン</option>';
+        
+        // ユニークなゾーンのリストを作成
+        const zones = [...new Set(data.map(device => device.zone))];
+        zones.sort().forEach(zone => {
+          if (zone && zone !== 'unknown') {
+            const option = document.createElement('option');
+            option.value = zone;
+            option.textContent = zone;
+            zoneFilter.appendChild(option);
+          }
+        });
+        
+        // 'unknown'ゾーンを最後に追加
+        if (zones.includes('unknown')) {
+          const option = document.createElement('option');
+          option.value = 'unknown';
+          option.textContent = '不明なゾーン';
+          zoneFilter.appendChild(option);
+        }
+        
+        // 前回選択していたゾーンを復元
+        if (zones.includes(currentZone)) {
+          zoneFilter.value = currentZone;
+        }
+      }
+      
+      // ツールチップの表示
+      function showTooltip(device, event) {
+        const deviceType = getDeviceTypeLabel(getDeviceType(device.mac_address, device.name));
+        const lastSeen = new Date(device.last_seen * 1000);
+        const timeString = lastSeen.toLocaleTimeString();
+        
+        tooltip.innerHTML = `
+          <strong>${device.name || 'Unknown Device'}</strong><br>
+          MAC: ${device.mac_address}<br>
+          タイプ: ${deviceType}<br>
+          座標: (${device.x}, ${device.y})<br>
+          ゾーン: ${device.zone}<br>
+          最終検出: ${timeString}
+        `;
+        
+        positionTooltip(event);
+        tooltip.style.opacity = '1';
+      }
+      
+      // ツールチップの位置調整
+      function positionTooltip(event) {
+        const x = event.clientX + 10;
+        const y = event.clientY + 10;
+        
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+      }
+      
+      // ツールチップを非表示
+      function hideTooltip() {
+        tooltip.style.opacity = '0';
+      }
+      
+      // ステータスメッセージの表示
+      function showStatus(message, isError = false) {
+        status.textContent = message;
+        status.className = isError ? 'status visible error' : 'status visible';
+        
+        // 3秒後に非表示
+        setTimeout(() => {
+          status.className = 'status';
+        }, 3000);
+      }
+      
+      // デバイスの種類を推測
+      function getDeviceType(macAddress, name) {
+        if (!name) name = '';
+        const nameLower = name.toLowerCase();
+        
+        // 名前に基づく分類
+        if (
+          nameLower.includes('iphone') || 
+          nameLower.includes('android') || 
+          nameLower.includes('pixel') || 
+          nameLower.includes('galaxy') || 
+          nameLower.includes('xiaomi') || 
+          nameLower.includes('huawei')
+        ) {
+          return 'smartphone';
+        }
+        
+        if (
+          nameLower.includes('headphone') || 
+          nameLower.includes('airpod') || 
+          nameLower.includes('earphone') || 
+          nameLower.includes('earbud') || 
+          nameLower.includes('headset') ||
+          nameLower.includes('bose') || 
+          nameLower.includes('sony wh') || 
+          nameLower.includes('jabra')
+        ) {
+          return 'headphones';
+        }
+        
+        // MACアドレスの最初の3バイトに基づく分類（例: Appleのデバイスなど）
+        // ※実際の実装では、メーカーIDデータベースを使用することも検討
+        
+        return 'other';
+      }
+      
+      // デバイスタイプのラベル
+      function getDeviceTypeLabel(type) {
+        switch (type) {
+          case 'smartphone': return 'スマートフォン';
+          case 'headphones': return 'ヘッドフォン';
+          default: return 'その他';
+        }
+      }
+      
+      // デバイスタイプの色
+      function getColorByType(type) {
+        switch (type) {
+          case 'smartphone': return '#3498db';
+          case 'headphones': return '#e74c3c';
+          default: return '#2ecc71';
+        }
+      }
+      
+      // デバイスにビューを中心化
+      function centerViewOnDevice(device) {
+        const mapWidth = gridMap.clientWidth;
+        const mapHeight = gridMap.clientHeight;
+        
+        // デバイスの座標をグリッド上の中心に合わせる
+        panOffset.x = mapWidth / 2 - device.x * cellSize * zoomLevel;
+        panOffset.y = mapHeight / 2 - device.y * cellSize * zoomLevel;
+        
+        initializeGrid();
+      }
+      
+      // ズームインボタン
+      document.getElementById('zoom-in').addEventListener('click', () => {
+        if (zoomLevel < 2) {
+          zoomLevel += 0.2;
+          initializeGrid();
+          showStatus(`ズームレベル: ${zoomLevel.toFixed(1)}x`);
+        }
+      });
+      
+      // ズームアウトボタン
+      document.getElementById('zoom-out').addEventListener('click', () => {
+        if (zoomLevel > 0.4) {
+          zoomLevel -= 0.2;
+          initializeGrid();
+          showStatus(`ズームレベル: ${zoomLevel.toFixed(1)}x`);
+        }
+      });
+      
+      // リセットボタン
+      document.getElementById('reset-view').addEventListener('click', () => {
+        zoomLevel = 1;
+        panOffset = { x: 0, y: 0 };
+        initializeGrid();
+        showStatus('表示をリセットしました');
+      });
+      
+      // ゾーンフィルター変更イベント
+      zoneFilter.addEventListener('change', () => {
+        selectedZone = zoneFilter.value;
+        updateDeviceMarkers();
+        updateDeviceList();
+        showStatus(`ゾーン「${selectedZone === 'all' ? '全て' : selectedZone}」を表示`);
+      });
+      
+      // グリッドのドラッグ操作
+      gridMap.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        lastMousePos = { x: e.clientX, y: e.clientY };
+      });
+      
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const dx = e.clientX - lastMousePos.x;
+        const dy = e.clientY - lastMousePos.y;
+        
+        panOffset.x += dx;
+        panOffset.y += dy;
+        
+        lastMousePos = { x: e.clientX, y: e.clientY };
+        initializeGrid();
+      });
+      
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+      
+      // マウスホイールでのズーム
+      gridMap.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        const delta = -Math.sign(e.deltaY) * 0.1;
+        const newZoomLevel = zoomLevel + delta;
+        
+        if (newZoomLevel >= 0.4 && newZoomLevel <= 2) {
+          zoomLevel = newZoomLevel;
+          initializeGrid();
+        }
+      });
+      
+      // ウィンドウリサイズ時にグリッドを再描画
+      window.addEventListener('resize', () => {
+        initializeGrid();
+      });
+    });
+  </script>
+</body>
+</html>
