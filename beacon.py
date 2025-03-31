@@ -45,11 +45,12 @@ class BluetoothBeacon:
             raise
 
     async def scan_devices(self):
-        """30秒間Bluetoothデバイスをスキャンし、RSSIの平均値を計算する"""
+        """デバイスをスキャンし、RSSIの平均値を計算する"""
         logger.info(f"{self.scan_duration}秒間のスキャンを開始します...")
         
         # デバイスごとのRSSI値を格納する辞書
         devices_rssi = {}
+        devices_names = {}
         
         # スキャン開始時間
         start_time = time.time()
@@ -62,6 +63,7 @@ class BluetoothBeacon:
             for device in devices:
                 if device.address not in devices_rssi:
                     devices_rssi[device.address] = []
+                    devices_names[device.address] = device.name or "Unknown"
                 
                 # RSSI値を記録
                 if device.rssi is not None:
@@ -80,11 +82,12 @@ class BluetoothBeacon:
                 avg_rssi = statistics.mean(rssi_values)
                 device_info = {
                     'mac_address': mac_address,
+                    'name': devices_names[mac_address],
                     'rssi': avg_rssi,
                     'sample_count': len(rssi_values)
                 }
                 result.append(device_info)
-                logger.debug(f"デバイス {mac_address}: 平均RSSI={avg_rssi:.2f} ({len(rssi_values)}サンプル)")
+                logger.debug(f"デバイス {mac_address} (名前: {devices_names[mac_address]}): 平均RSSI={avg_rssi:.2f} ({len(rssi_values)}サンプル)")
         
         logger.info(f"{len(result)}台のデバイスを検出しました")
         return result

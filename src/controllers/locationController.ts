@@ -143,7 +143,7 @@ export class LocationController {
     db.saveDeviceLocation({
       id: currentDeviceInfo?.id || 0,
       mac_address: device.mac_address,
-      name: device.name,
+      name: device.name || currentDeviceInfo?.name,  // デバイス名がセットされている場合は使用、無い場合は既存の名前を維持
       x,
       y,
       last_seen: timestamp,

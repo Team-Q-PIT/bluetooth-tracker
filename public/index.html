@@ -608,12 +608,12 @@
         const timeString = lastSeen.toLocaleTimeString();
         
         tooltip.innerHTML = `
-          <strong>${device.name || 'Unknown Device'}</strong><br>
-          MAC: ${device.mac_address}<br>
-          タイプ: ${deviceType}<br>
-          座標: (${device.x}, ${device.y})<br>
-          ゾーン: ${device.zone}<br>
-          最終検出: ${timeString}
+        <strong>${device.name ? device.name : 'Unknown Device'}</strong><br>
+        MAC: ${device.mac_address}<br>
+        タイプ: ${deviceType}<br>
+        座標: (${device.x}, ${device.y})<br>
+        ゾーン: ${device.zone}<br>
+        最終検出: ${timeString}
         `;
         
         positionTooltip(event);
