@@ -18,7 +18,7 @@ class DatabaseManager {
     console.log('インメモリデータベースが初期化されました');
     
     // 定期的にディスクに保存
-    setInterval(() => this.saveToDisk(), 60000); // 1分ごとに保存
+    setInterval(() => this.saveToDisk(), 30000); // 30秒ごとに保存
   }
 
   /**

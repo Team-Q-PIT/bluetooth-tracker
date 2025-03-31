@@ -24,8 +24,8 @@ class BluetoothBeacon:
         self.server_url = server_url
         self.beacon_id = None
         self.location = None
-        self.scan_duration = 30  # 30秒間スキャン
-        self.scan_interval = 5   # 5秒間隔でスキャン
+        self.scan_duration = 10  # 10秒間スキャン
+        self.scan_interval = 2   # 2秒間隔でスキャン
         self.load_config()
 
     def load_config(self):

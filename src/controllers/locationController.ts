@@ -16,11 +16,11 @@ export class LocationController {
     
     // 定期的に古いデバイスデータをクリーンアップ（1時間以上古いデータを削除）
     setInterval(() => {
-      const deleted = db.cleanupOldDevices(3600);
+      const deleted = db.cleanupOldDevices(1800); // 30分以上前のデータを削除
       if (deleted > 0) {
         console.log(`${deleted}件の古いデバイスデータを削除しました`);
       }
-    }, 15 * 60 * 1000); // 15分ごとに実行
+    }, 5 * 60 * 1000); // 5分ごとに実行
   }
 
   /**
