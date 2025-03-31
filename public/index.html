@@ -67,6 +67,26 @@
       background-color: #e74c3c;
     }
     
+    .device.beacon {
+      background-color: #f39c12;
+      border-radius: 0;
+      width: 12px;
+      height: 12px;
+      transform: rotate(45deg);
+    }
+    
+    .device.beacon::after {
+      content: "";
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      width: 20px;
+      height: 20px;
+      border: 1px dashed rgba(243, 156, 18, 0.7);
+      border-radius: 50%;
+      transform: rotate(-45deg);
+    }
+    
     .device.other {
       background-color: #2ecc71;
     }
@@ -239,6 +259,10 @@
           <div class="legend-color" style="background-color: #2ecc71;"></div>
           <span>その他のデバイス</span>
         </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background-color: #f39c12; border-radius: 0;"></div>
+          <span>ビーコン</span>
+        </div>
       </div>
       
       <div class="controls">
@@ -271,6 +295,7 @@
       const zoneFilter = document.getElementById('zone-filter');
       
       let devices = [];
+      let beacons = [];
       let zoomLevel = 1;
       let panOffset = { x: 0, y: 0 };
       let isDragging = false;
@@ -292,6 +317,12 @@
         updateDeviceList();
       });
       
+      // ビーコン情報の受信
+      socket.on('beaconLocations', (data) => {
+        beacons = data;
+        updateBeaconMarkers();
+      });
+      
       // 接続時のイベント
       socket.on('connect', () => {
         showStatus('サーバーに接続しました');
@@ -302,6 +333,61 @@
         showStatus('サーバーから切断されました', true);
       });
       
+      // ビーコンマーカーの更新
+      function updateBeaconMarkers() {
+        // 既存のビーコンマーカーを削除
+        document.querySelectorAll('.device.beacon').forEach(el => el.remove());
+        
+        // 新しいビーコンマーカーを作成
+        beacons.forEach(beacon => {
+          // ゾーンフィルタリング
+          if (selectedZone !== 'all' && beacon.zone !== selectedZone) {
+            return;
+          }
+          
+          const marker = document.createElement('div');
+          marker.className = 'device beacon';
+          marker.id = `beacon-${beacon.id.replace(/[^a-zA-Z0-9]/g, '-')}`;
+          
+          // 座標をグリッド座標からピクセル座標に変換
+          const pixelX = beacon.x * cellSize * zoomLevel + panOffset.x;
+          const pixelY = beacon.y * cellSize * zoomLevel + panOffset.y;
+          
+          marker.style.left = `${pixelX}px`;
+          marker.style.top = `${pixelY}px`;
+          
+          // マウスオーバー時のツールチップ
+          marker.addEventListener('mouseover', (e) => {
+            showBeaconTooltip(beacon, e);
+          });
+          
+          marker.addEventListener('mousemove', (e) => {
+            positionTooltip(e);
+          });
+          
+          marker.addEventListener('mouseout', () => {
+            hideTooltip();
+          });
+          
+          gridMap.appendChild(marker);
+        });
+      }
+      
+      // ビーコンのツールチップ表示
+      function showBeaconTooltip(beacon, event) {
+        const lastSeen = new Date(beacon.last_seen * 1000);
+        const timeString = lastSeen.toLocaleTimeString();
+        
+        tooltip.innerHTML = `
+          <strong>ビーコン: ${beacon.id}</strong><br>
+          ゾーン: ${beacon.zone}<br>
+          座標: (${beacon.x}, ${beacon.y})<br>
+          最終受信: ${timeString}
+        `;
+        
+        positionTooltip(event);
+        tooltip.style.opacity = '1';
+      }
       // グリッドの初期化
       initializeGrid();
       
@@ -360,6 +446,9 @@
         
         // デバイスマーカーの更新
         updateDeviceMarkers();
+        
+        // ビーコンマーカーの更新
+        updateBeaconMarkers();
       }
       
       // デバイスマーカーの更新
@@ -652,6 +741,7 @@
       zoneFilter.addEventListener('change', () => {
         selectedZone = zoneFilter.value;
         updateDeviceMarkers();
+        updateBeaconMarkers();
         updateDeviceList();
         showStatus(`ゾーン「${selectedZone === 'all' ? '全て' : selectedZone}」を表示`);
       });

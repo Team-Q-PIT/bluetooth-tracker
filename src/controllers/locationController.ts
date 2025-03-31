@@ -168,8 +168,28 @@ export class LocationController {
       };
     });
     
+    // ビーコン情報も送信
+    this.broadcastBeaconLocations();
+    
     // WebSocketを通じてクライアントに送信
     this.io.emit('deviceLocations', deviceLocations);
+  }
+  
+  /**
+   * 全てのビーコンの情報をクライアントに送信
+   */
+  public broadcastBeaconLocations(): void {
+    const beacons = db.getAllBeacons();
+    const beaconLocations = beacons.map(beacon => ({
+      id: beacon.id,
+      x: beacon.x,
+      y: beacon.y,
+      zone: beacon.zone,
+      last_seen: beacon.last_seen
+    }));
+    
+    // WebSocketを通じてクライアントに送信
+    this.io.emit('beaconLocations', beaconLocations);
   }
 
   /**
